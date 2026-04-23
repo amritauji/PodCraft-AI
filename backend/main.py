@@ -2,7 +2,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from config.settings import ALLOWED_ORIGINS
 from routes import upload, topics, script
@@ -32,5 +32,8 @@ app.include_router(script.router)
 def root():
     index_file = FRONTEND_DIR / "index.html"
     if index_file.exists():
-        return FileResponse(index_file)
+        html = index_file.read_text(encoding="utf-8")
+        if "/assets/script.js" not in html:
+            html = html.replace("</body>", '<script src="/assets/script.js" defer></script>\n</body>', 1)
+        return HTMLResponse(html)
     return {"status": "PodCraft AI is running"}
