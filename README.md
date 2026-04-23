@@ -62,8 +62,8 @@ uv pip install -r requirements.txt
 # 4. Run the backend
 uv run uvicorn main:app --reload --port 8000
 
-# 5. Open frontend
-# Open frontend/index.html in a browser (or use Live Server)
+# 5. Open the app
+# Visit http://localhost:8000 in your browser. The FastAPI app now serves the frontend UI and API from the same origin.
 ```
 
 ---
@@ -75,7 +75,7 @@ uv run uvicorn main:app --reload --port 8000
 cd docker
 docker-compose up --build
 
-# Backend runs at http://localhost:8000
+# Backend and frontend run together at http://localhost:8000
 ```
 
 ---
@@ -89,7 +89,7 @@ docker-compose up --build
 3. Upload all files from `frontend/` folder
 4. Go to Properties → Static Website Hosting → Enable
 5. Set index document to `index.html`
-6. Update `API_BASE_URL` in `frontend/script.js` to your EC2 public IP:
+6. Update `API_BASE_URL` in `frontend/script.js` to your EC2 public IP if you keep the frontend separate. If you serve the frontend from FastAPI, you can keep it on the same origin instead:
    ```js
    const API_BASE_URL = "http://<your-ec2-public-ip>:8000";
    ```

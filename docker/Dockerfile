@@ -10,10 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc curl \
 
 ENV PATH="/root/.local/bin:$PATH"
 
-COPY requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN uv pip install --system --no-cache -r backend/requirements.txt
 
-COPY . .
+COPY backend ./backend
+COPY frontend ./frontend
+
+WORKDIR /app/backend
 
 EXPOSE 8000
 

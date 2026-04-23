@@ -1,11 +1,12 @@
 # Agent Step 4 + 5: Dynamic Prompt Builder + Script Generator
 # Uses LangChain + Groq (LLaMA) to generate a full podcast script
 
-from langchain_groq import ChatGroq
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from config.settings import GROQ_API_KEY
 from typing import List
+
+from langchain_core.prompts import PromptTemplate
+from langchain_groq import ChatGroq
+
+from config.settings import GROQ_API_KEY
 
 # Approximate words per minute based on speed slider (1–10 scale)
 def _words_for_duration(duration_minutes: int, speed: int) -> int:
@@ -53,23 +54,21 @@ def generate_podcast_script(
     # Use first 3000 chars of document as context
     excerpt = document_text[:3000].strip()
 
-    prompt = PromptTemplate(
-        input_variables=["host_name", "host_gender", "guest_name", "guest_gender",
-                         "topics", "word_count", "document_excerpt"],
-        template=SCRIPT_TEMPLATE,
-    )
+    prompt = PromptTemplate.from_template(SCRIPT_TEMPLATE)
 
     llm = ChatGroq(api_key=GROQ_API_KEY, model_name="llama3-8b-8192", temperature=0.7)
-    chain = LLMChain(llm=llm, prompt=prompt)
+    chain = prompt | llm
 
-    result = chain.run(
-        host_name=host_name,
-        host_gender=host_gender,
-        guest_name=guest_name,
-        guest_gender=guest_gender,
-        topics=", ".join(topics),
-        word_count=word_count,
-        document_excerpt=excerpt,
+    result = chain.invoke(
+        {
+            "host_name": host_name,
+            "host_gender": host_gender,
+            "guest_name": guest_name,
+            "guest_gender": guest_gender,
+            "topics": ", ".join(topics),
+            "word_count": word_count,
+            "document_excerpt": excerpt,
+        }
     )
 
-    return result.strip()
+    return result.content.strip()

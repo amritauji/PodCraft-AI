@@ -1,9 +1,9 @@
 # Agent Step 6: Script Refiner
 # Regenerates the full script based on user modification instructions
 
+from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+
 from config.settings import GROQ_API_KEY
 
 REFINE_TEMPLATE = """
@@ -27,23 +27,21 @@ Write the complete revised script now:
 """
 
 def refine_script(original_script: str, instruction: str, context: dict) -> str:
-    prompt = PromptTemplate(
-        input_variables=["original_script", "instruction", "host_name",
-                         "host_gender", "guest_name", "guest_gender", "topics"],
-        template=REFINE_TEMPLATE,
-    )
+    prompt = PromptTemplate.from_template(REFINE_TEMPLATE)
 
     llm = ChatGroq(api_key=GROQ_API_KEY, model_name="llama3-8b-8192", temperature=0.7)
-    chain = LLMChain(llm=llm, prompt=prompt)
+    chain = prompt | llm
 
-    result = chain.run(
-        original_script=original_script,
-        instruction=instruction,
-        host_name=context.get("host_name", "Host"),
-        host_gender=context.get("host_gender", ""),
-        guest_name=context.get("guest_name", "Guest"),
-        guest_gender=context.get("guest_gender", ""),
-        topics=", ".join(context.get("topics", [])),
+    result = chain.invoke(
+        {
+            "original_script": original_script,
+            "instruction": instruction,
+            "host_name": context.get("host_name", "Host"),
+            "host_gender": context.get("host_gender", ""),
+            "guest_name": context.get("guest_name", "Guest"),
+            "guest_gender": context.get("guest_gender", ""),
+            "topics": ", ".join(context.get("topics", [])),
+        }
     )
 
-    return result.strip()
+    return result.content.strip()

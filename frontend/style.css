@@ -1,1 +1,54 @@
-/* PodCraft AI — Styles (UI coming soon) */
+:root {
+	color-scheme: light;
+}
+
+body {
+	margin: 0;
+}
+
+.material-symbols-outlined {
+	font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.material-symbols-outlined.fill {
+	font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.topic-chip {
+	border-radius: 9999px;
+	border: 1px solid #d8e1ea;
+	background: #fff;
+	padding: 0.55rem 0.9rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: #334155;
+	transition: all 160ms ease;
+}
+
+.topic-chip:hover {
+	border-color: #0f766e;
+	background: #f0fbf9;
+}
+
+.topic-chip-active {
+	border-color: #0f766e;
+	background: #0f766e;
+	color: #fff;
+}
+
+.dropzone-active {
+	border-color: #0f766e !important;
+	background: rgba(217, 243, 239, 0.7) !important;
+}
+
+#status[data-tone="success"] {
+	color: #0f766e;
+}
+
+#status[data-tone="error"] {
+	color: #b91c1c;
+}
+
+#status[data-tone="neutral"] {
+	color: #334155;
+}
