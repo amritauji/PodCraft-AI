@@ -1,62 +1,24 @@
-const resolvedOrigin = window.location.origin;
-const API_BASE_URL = window.PODCRAFT_API_BASE_URL || ((resolvedOrigin && resolvedOrigin !== "null" && !resolvedOrigin.startsWith("file:")) ? resolvedOrigin : "http://localhost:8000");
+const API_BASE_URL = window.PODCRAFT_API_BASE_URL || (window.location.origin && !window.location.origin.startsWith("file:") ? window.location.origin : "http://localhost:8000");
 
 const state = {
 	file: null,
 	extractedTopics: [],
 	selectedTopics: new Set(),
 	script: "",
-	busy: false,
 };
 
-const dom = {};
-
-function $(id) {
-	return document.getElementById(id);
-}
-
-function initializeDom() {
-	dom.fileInput = $("file-input");
-	dom.dropzone = $("dropzone");
-	dom.uploadButton = $("upload-button");
-	dom.extractButton = $("extract-button");
-	dom.generateButton = $("generate-button");
-	dom.refineButton = $("refine-button");
-	dom.resetButton = $("reset-button");
-	dom.copyButton = $("copy-button");
-	dom.downloadButton = $("download-button");
-	dom.hostName = $("host-name");
-	dom.hostGender = $("host-gender");
-	dom.guestName = $("guest-name");
-	dom.guestGender = $("guest-gender");
-	dom.hostSpeed = $("host-speed");
-	dom.guestSpeed = $("guest-speed");
-	dom.duration = $("duration");
-	dom.manualTopics = $("manual-topics");
-	dom.topicList = $("topic-list");
-	dom.topicSummary = $("topic-summary");
-	dom.validationSummary = $("validation-summary");
-	dom.scriptEditor = $("script-editor");
-	dom.refineInstruction = $("refine-instruction");
-	dom.fileName = $("file-name");
-	dom.status = $("status");
-	dom.uploadState = $("upload-state");
-	dom.topicCount = $("topic-count");
-	dom.scriptStats = $("script-stats");
-	dom.durationStat = $("duration-stat");
-	dom.copyStatus = $("copy-status");
-}
-
-function setStatus(message, tone = "neutral") {
-	if (!dom.status) return;
-	dom.status.textContent = message;
-	dom.status.dataset.tone = tone;
-}
-
-function setBusy(isBusy) {
-	state.busy = isBusy;
-	[dom.uploadButton, dom.extractButton, dom.generateButton, dom.refineButton, dom.resetButton].forEach((button) => {
-		if (button) button.disabled = isBusy;
+function apiRequest(path, options = {}) {
+	return fetch(`${API_BASE_URL}${path}`, {
+		headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json", ...(options.headers || {}) },
+		...options,
+	}).then(async (response) => {
+		const contentType = response.headers.get("content-type") || "";
+		const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+		if (!response.ok) {
+			const message = typeof payload === "string" ? payload : payload?.detail || payload?.message || "Request failed";
+			throw new Error(message);
+		}
+		return payload;
 	});
 }
 
@@ -65,331 +27,255 @@ function escapeHtml(value) {
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
-		.replace(/\"/g, "&quot;")
+		.replace(/"/g, "&quot;")
 		.replace(/'/g, "&#39;");
 }
 
-function normalizeTopics(rawText) {
-	return rawText
-		.split(/[,\n]/)
-		.map((topic) => topic.trim())
-		.filter(Boolean);
+function getSections() {
+	return Array.from(document.querySelectorAll("section"));
 }
 
-function selectedTopics() {
-	const manual = normalizeTopics(dom.manualTopics?.value || "");
-	if (manual.length) {
-		return manual;
+function findSection(titleText) {
+	return getSections().find((section) => section.textContent.includes(titleText));
+}
+
+function findButtonByText(container, text) {
+	return Array.from(container.querySelectorAll("button")).find((button) => button.textContent.replace(/\s+/g, " ").trim().includes(text));
+}
+
+function setScriptContent(editor, text) {
+	state.script = text || "";
+	const lines = state.script.split(/\r?\n/).filter((line) => line.trim().length > 0);
+	if (!lines.length) {
+		editor.innerHTML = '<p class="text-on-surface-variant">Your generated podcast script will appear here.</p>';
+		return;
 	}
-	const selected = Array.from(state.selectedTopics);
-	return selected;
+	editor.innerHTML = lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("");
 }
 
-function renderTopics() {
-	if (!dom.topicList) return;
+function updateInsights(insights, editor, durationSelect, speedRange) {
+	const wordCount = state.script.trim() ? state.script.trim().split(/\s+/).length : 0;
+	const durationMinutes = Number(durationSelect.value || 30);
+	const avgSpeed = Number(speedRange.value || 5);
+	const estimatedWords = durationMinutes * (100 + (avgSpeed - 1) * 15);
+	const coverage = state.extractedTopics.length ? Math.round((state.selectedTopics.size || state.extractedTopics.length) / state.extractedTopics.length * 100) : 0;
 
+	const durationValue = insights.querySelector('span.font-semibold');
+	const topicCoverageValue = Array.from(insights.querySelectorAll('span.font-semibold')).find((node) => /%$/.test(node.textContent.trim()));
+	const durationBar = insights.querySelector('.bg-primary.rounded-full');
+	const topicSegments = insights.querySelectorAll('.w-full.h-1\.5.bg-surface-variant.rounded-full.overflow-hidden.flex > div');
+	const topicLegend = insights.querySelectorAll('.flex.justify-between.text-label-sm.font-label-sm.text-on-surface-variant.mt-xs span');
+	const toneParagraph = Array.from(insights.querySelectorAll('p')).find((paragraph) => paragraph.textContent.includes('The dialogue maintains'));
+
+	if (durationValue) {
+		durationValue.textContent = `${Math.max(1, Math.round(wordCount / Math.max((estimatedWords / Math.max(durationMinutes, 1)), 1)))}m ${Math.round((wordCount % 100) / 10)}s`;
+	}
+	if (durationBar) {
+		const pct = Math.min(100, Math.max(5, Math.round((wordCount / Math.max(estimatedWords, 1)) * 100)));
+		durationBar.style.width = `${pct}%`;
+	}
+	if (topicCoverageValue) {
+		topicCoverageValue.textContent = `${coverage}%`;
+	}
+	if (topicSegments.length >= 2) {
+		const selected = Math.max(1, state.selectedTopics.size || state.extractedTopics.length || 1);
+		const first = Math.round((selected / Math.max(state.extractedTopics.length || 1, 1)) * 100);
+		topicSegments[0].style.width = `${Math.min(100, first)}%`;
+		topicSegments[1].style.width = `${Math.max(0, 100 - first)}%`;
+	}
+	if (topicLegend.length >= 2) {
+		const topics = Array.from(state.selectedTopics.size ? state.selectedTopics : state.extractedTopics).slice(0, 2);
+		topicLegend[0].textContent = topics[0] || 'AI Ethics';
+		topicLegend[1].textContent = topics[1] || 'Future of Work';
+	}
+	if (toneParagraph) {
+		toneParagraph.textContent = state.script.includes('?')
+			? 'The dialogue maintains a conversational and analytical tone with natural host/guest exchanges.'
+			: 'The dialogue maintains a high-level academic tone suitable for industry professionals, though lacks conversational bridges.';
+	}
+	editor.dataset.wordCount = String(wordCount);
+}
+
+function renderTopics(topicContainer) {
 	if (!state.extractedTopics.length) {
-		dom.topicList.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">Upload a document and click Analyze to extract topics.</div>';
-		if (dom.topicCount) dom.topicCount.textContent = "0";
-		if (dom.topicSummary) dom.topicSummary.textContent = "No topics extracted yet.";
+		topicContainer.innerHTML = '<div class="bg-surface text-on-surface-variant px-md py-xs rounded-full font-label-sm text-label-sm border border-outline-variant">No topics extracted yet.</div>';
 		return;
 	}
 
-	dom.topicList.innerHTML = state.extractedTopics
-		.map((topic) => {
-			const active = state.selectedTopics.has(topic);
-			return `
-				<button
-					type="button"
-					class="topic-chip ${active ? "topic-chip-active" : ""}"
-					data-topic="${escapeHtml(topic)}"
-					aria-pressed="${active}"
-				>
-					${escapeHtml(topic)}
-				</button>`;
-		})
-		.join("");
-
-	if (dom.topicCount) dom.topicCount.textContent = String(state.selectedTopics.size || state.extractedTopics.length);
-	if (dom.topicSummary) {
-		dom.topicSummary.textContent = `${state.extractedTopics.length} extracted topic${state.extractedTopics.length === 1 ? "" : "s"}. Click to include or exclude them from the script.`;
-	}
+	topicContainer.innerHTML = state.extractedTopics.map((topic) => {
+		const active = state.selectedTopics.size ? state.selectedTopics.has(topic) : true;
+		return `
+			<button type="button" class="${active ? 'bg-primary-container text-on-primary-container' : 'bg-surface text-on-surface-variant'} px-md py-xs rounded-full font-label-sm text-label-sm flex items-center gap-xs cursor-pointer shadow-sm border ${active ? 'border-transparent' : 'border-outline-variant hover:bg-surface-container-low'}" data-topic="${escapeHtml(topic)}">
+				${active ? '<span class="material-symbols-outlined text-[14px]">check</span>' : ''}
+				${escapeHtml(topic)}
+			</button>`;
+	}).join('');
 }
 
-function renderValidation(validation) {
-	if (!dom.validationSummary) return;
+function bindApp() {
+	const sourceSection = findSection('Source Material');
+	const topicSection = findSection('Extracted Topics');
+	const scriptSection = findSection('Script Output');
+	const insightsSection = Array.from(document.querySelectorAll('aside')).find((aside) => aside.textContent.includes('AI Insights'));
 
-	if (!validation) {
-		dom.validationSummary.textContent = "Validation status will appear here after generation.";
-		return;
+	const dropzone = sourceSection.querySelector('.border-dashed');
+	const extractButton = findButtonByText(sourceSection, 'Extract Topics');
+	const hostInput = sourceSection.querySelector('input[placeholder*="Sarah"]');
+	const guestInput = sourceSection.querySelector('input[placeholder*="Dr. Smith"]');
+	const speedRange = sourceSection.querySelector('input[type="range"]');
+	const durationSelect = sourceSection.querySelector('select');
+	const topicContainer = topicSection.querySelector('.flex.flex-wrap.gap-sm');
+	const generateButton = findButtonByText(topicSection, 'Generate Script');
+	const editor = scriptSection.querySelector('[contenteditable="true"]');
+	const promptInput = scriptSection.querySelector('input[placeholder*="rewrite"]');
+	const promptButton = scriptSection.querySelector('button.absolute');
+	const copyButton = Array.from(scriptSection.querySelectorAll('button')).find((button) => button.textContent.replace(/\s+/g, ' ').trim().includes('Copy'));
+	const exportButton = Array.from(scriptSection.querySelectorAll('button')).find((button) => button.textContent.replace(/\s+/g, ' ').trim().includes('Export'));
+	const fileInput = document.createElement('input');
+	fileInput.type = 'file';
+	fileInput.accept = '.pdf,.docx,.txt';
+	fileInput.style.display = 'none';
+	document.body.appendChild(fileInput);
+
+	function syncDropzoneLabel() {
+		const label = dropzone.querySelector('p');
+		if (label) {
+			label.textContent = state.file ? `Selected: ${state.file.name}` : 'Drag & drop raw audio, video, or notes here';
+		}
 	}
 
-	const included = validation.included_topics || [];
-	const ignored = validation.ignored_topics || [];
-	const parts = [];
-	if (included.length) parts.push(`Included: ${included.join(", ")}`);
-	if (ignored.length) parts.push(`Ignored: ${ignored.join(", ")}`);
-	dom.validationSummary.textContent = parts.join(" | ") || "No validation details returned.";
-}
-
-function renderScript(script) {
-	state.script = script || "";
-	if (dom.scriptEditor) dom.scriptEditor.value = state.script;
-	if (dom.scriptStats) dom.scriptStats.textContent = `${Math.max(state.script.trim().split(/\s+/).filter(Boolean).length, 0)} words`;
-	if (dom.durationStat) dom.durationStat.textContent = `${dom.duration?.value || "30"} minutes`;
-}
-
-function updateUploadState() {
-	if (dom.uploadState) {
-		dom.uploadState.textContent = state.file ? `Ready to upload: ${state.file.name}` : "No file selected";
+	function syncTopicState() {
+		renderTopics(topicContainer);
+		updateInsights(insightsSection, editor, durationSelect, speedRange);
 	}
-	if (dom.fileName) {
-		dom.fileName.textContent = state.file ? state.file.name : "Choose a PDF, DOCX, or TXT file";
-	}
-}
 
-async function apiRequest(path, options = {}) {
-	const response = await fetch(`${API_BASE_URL}${path}`, {
-		headers: options.body instanceof FormData ? undefined : { "Content-Type": "application/json", ...(options.headers || {}) },
-		...options,
+	function uploadSelectedFile() {
+		if (!state.file) {
+			fileInput.click();
+			return;
+		}
+		const formData = new FormData();
+		formData.append('file', state.file);
+		return apiRequest('/upload-docs', { method: 'POST', body: formData });
+	}
+
+	fileInput.addEventListener('change', () => {
+		state.file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+		syncDropzoneLabel();
 	});
 
-	const contentType = response.headers.get("content-type") || "";
-	const payload = contentType.includes("application/json") ? await response.json() : await response.text();
-
-	if (!response.ok) {
-		const detail = typeof payload === "string" ? payload : payload?.detail || payload?.message || "Request failed";
-		throw new Error(detail);
-	}
-
-	return payload;
-}
-
-async function uploadDocument() {
-	if (!state.file) {
-		throw new Error("Choose a document first.");
-	}
-
-	const formData = new FormData();
-	formData.append("file", state.file);
-
-	return apiRequest("/upload-docs", {
-		method: "POST",
-		body: formData,
-	});
-}
-
-async function extractTopics() {
-	const payload = await apiRequest("/extract-topics");
-	const topics = Array.isArray(payload.topics) ? payload.topics : [];
-	state.extractedTopics = topics;
-	state.selectedTopics = new Set(topics);
-	renderTopics();
-	setStatus(`Extracted ${topics.length} topic${topics.length === 1 ? "" : "s"}.`, "success");
-}
-
-function buildScriptRequest() {
-	const topics = selectedTopics();
-
-	return {
-		host_name: dom.hostName.value.trim() || "Host",
-		host_gender: dom.hostGender.value,
-		guest_name: dom.guestName.value.trim() || "Guest",
-		guest_gender: dom.guestGender.value,
-		host_speed: Number(dom.hostSpeed.value),
-		guest_speed: Number(dom.guestSpeed.value),
-		duration: Number(dom.duration.value),
-		topics,
-	};
-}
-
-async function generateScript() {
-	const request = buildScriptRequest();
-	if (!request.topics.length) {
-		throw new Error("Select or enter at least one topic.");
-	}
-
-	const validation = await apiRequest("/validate-topics", {
-		method: "POST",
-		body: JSON.stringify({ user_topics: request.topics }),
-	});
-	renderValidation(validation);
-
-	const payload = await apiRequest("/generate-script", {
-		method: "POST",
-		body: JSON.stringify(request),
-	});
-
-	renderScript(payload.script || "");
-	setStatus("Script generated and saved to Supabase.", "success");
-}
-
-async function refineScript() {
-	const instruction = dom.refineInstruction.value.trim();
-	if (!instruction) {
-		throw new Error("Add a refinement instruction first.");
-	}
-
-	const payload = await apiRequest("/modify-script", {
-		method: "POST",
-		body: JSON.stringify({ instruction }),
-	});
-
-	renderScript(payload.script || "");
-	setStatus("Script refined.", "success");
-}
-
-async function resetWorkspace() {
-	await apiRequest("/reset", { method: "POST" });
-	state.file = null;
-	state.extractedTopics = [];
-	state.selectedTopics = new Set();
-	state.script = "";
-	if (dom.fileInput) dom.fileInput.value = "";
-	if (dom.manualTopics) dom.manualTopics.value = "";
-	if (dom.refineInstruction) dom.refineInstruction.value = "";
-	renderTopics();
-	renderValidation(null);
-	renderScript("");
-	updateUploadState();
-	setStatus("Workspace reset.", "neutral");
-}
-
-async function handleAnalyze() {
-	setBusy(true);
-	try {
-		await uploadDocument();
-		await extractTopics();
-	} catch (error) {
-		setStatus(error.message, "error");
-	} finally {
-		setBusy(false);
-	}
-}
-
-async function handleGenerate() {
-	setBusy(true);
-	try {
-		await generateScript();
-	} catch (error) {
-		setStatus(error.message, "error");
-	} finally {
-		setBusy(false);
-	}
-}
-
-async function handleRefine() {
-	setBusy(true);
-	try {
-		await refineScript();
-	} catch (error) {
-		setStatus(error.message, "error");
-	} finally {
-		setBusy(false);
-	}
-}
-
-async function handleCopy() {
-	if (!state.script) {
-		setStatus("Nothing to copy yet.", "neutral");
-		return;
-	}
-
-	try {
-		await navigator.clipboard.writeText(state.script);
-		if (dom.copyStatus) dom.copyStatus.textContent = "Copied";
-		setStatus("Script copied to clipboard.", "success");
-	} catch (error) {
-		setStatus("Clipboard access is unavailable in this browser context.", "error");
-	}
-}
-
-function handleDownload() {
-	if (!state.script) {
-		setStatus("Generate a script before exporting.", "neutral");
-		return;
-	}
-
-	const blob = new Blob([state.script], { type: "text/plain;charset=utf-8" });
-	const url = URL.createObjectURL(blob);
-	const link = document.createElement("a");
-	link.href = url;
-	link.download = "podcraft-script.txt";
-	link.click();
-	URL.revokeObjectURL(url);
-	setStatus("Script download started.", "success");
-}
-
-function bindEvents() {
-	dom.fileInput.addEventListener("change", (event) => {
-		state.file = event.target.files?.[0] || null;
-		updateUploadState();
-		setStatus(state.file ? "File selected. Click Analyze to upload and extract topics." : "", "neutral");
-	});
-
-	dom.dropzone.addEventListener("click", () => dom.fileInput.click());
-	dom.dropzone.addEventListener("dragover", (event) => {
+	dropzone.addEventListener('click', () => fileInput.click());
+	dropzone.addEventListener('dragover', (event) => event.preventDefault());
+	dropzone.addEventListener('drop', (event) => {
 		event.preventDefault();
-		dom.dropzone.classList.add("dropzone-active");
-	});
-	dom.dropzone.addEventListener("dragleave", () => dom.dropzone.classList.remove("dropzone-active"));
-	dom.dropzone.addEventListener("drop", (event) => {
-		event.preventDefault();
-		dom.dropzone.classList.remove("dropzone-active");
 		const [file] = event.dataTransfer.files || [];
 		if (file) {
 			state.file = file;
-			updateUploadState();
-			setStatus("File dropped. Click Analyze to continue.", "neutral");
+			syncDropzoneLabel();
 		}
 	});
 
-	dom.uploadButton.addEventListener("click", handleAnalyze);
-	dom.extractButton.addEventListener("click", async () => {
-		setBusy(true);
+	extractButton.addEventListener('click', async () => {
 		try {
-			await extractTopics();
+			await uploadSelectedFile();
+			const payload = await apiRequest('/extract-topics', { method: 'GET' });
+			state.extractedTopics = Array.isArray(payload.topics) ? payload.topics : [];
+			state.selectedTopics = new Set(state.extractedTopics);
+			syncTopicState();
 		} catch (error) {
-			setStatus(error.message, "error");
-		} finally {
-			setBusy(false);
+			alert(error.message);
 		}
 	});
-	dom.generateButton.addEventListener("click", handleGenerate);
-	dom.refineButton.addEventListener("click", handleRefine);
-	dom.resetButton.addEventListener("click", resetWorkspace);
-	dom.copyButton.addEventListener("click", handleCopy);
-	dom.downloadButton.addEventListener("click", handleDownload);
-	dom.scriptEditor.addEventListener("input", () => {
-		state.script = dom.scriptEditor.value;
-		renderScript(state.script);
-	});
 
-	dom.topicList.addEventListener("click", (event) => {
-		const chip = event.target.closest("[data-topic]");
+	topicContainer.addEventListener('click', (event) => {
+		const chip = event.target.closest('[data-topic]');
 		if (!chip) return;
-		const topic = chip.getAttribute("data-topic");
+		const topic = chip.getAttribute('data-topic');
 		if (state.selectedTopics.has(topic)) {
 			state.selectedTopics.delete(topic);
 		} else {
 			state.selectedTopics.add(topic);
 		}
-		renderTopics();
+		syncTopicState();
 	});
 
-	dom.manualTopics.addEventListener("input", () => {
-		dom.topicCount.textContent = String(normalizeTopics(dom.manualTopics.value).length || state.selectedTopics.size || 0);
+	function currentTopics() {
+		const manual = (promptInput.value || '').split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+		if (manual.length) return manual;
+		return Array.from(state.selectedTopics.size ? state.selectedTopics : state.extractedTopics);
+	}
+
+	generateButton.addEventListener('click', async () => {
+		try {
+			const topics = currentTopics();
+			const request = {
+				host_name: hostInput.value.trim() || 'Host',
+				host_gender: '',
+				guest_name: guestInput.value.trim() || 'Guest',
+				guest_gender: '',
+				host_speed: Number(speedRange.value || 5),
+				guest_speed: Number(speedRange.value || 5),
+				duration: Number(durationSelect.value || 30),
+				topics,
+			};
+			await apiRequest('/validate-topics', { method: 'POST', body: JSON.stringify({ user_topics: topics }) });
+			const payload = await apiRequest('/generate-script', { method: 'POST', body: JSON.stringify(request) });
+			setScriptContent(editor, payload.script || '');
+			updateInsights(insightsSection, editor, durationSelect, speedRange);
+		} catch (error) {
+			alert(error.message);
+		}
 	});
+
+	const refine = async () => {
+		const instruction = (promptInput.value || '').trim();
+		if (!instruction) return;
+		try {
+			const payload = await apiRequest('/modify-script', { method: 'POST', body: JSON.stringify({ instruction }) });
+			setScriptContent(editor, payload.script || '');
+			updateInsights(insightsSection, editor, durationSelect, speedRange);
+		} catch (error) {
+			alert(error.message);
+		}
+	};
+
+	promptButton.addEventListener('click', refine);
+	promptInput.addEventListener('keydown', (event) => {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			refine();
+		}
+	});
+
+	copyButton.addEventListener('click', async () => {
+		try {
+			await navigator.clipboard.writeText(state.script || editor.textContent || '');
+		} catch (error) {
+			alert('Clipboard unavailable');
+		}
+	});
+
+	exportButton.addEventListener('click', () => {
+		const blob = new Blob([state.script || editor.textContent || ''], { type: 'text/plain;charset=utf-8' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = 'podcraft-script.txt';
+		link.click();
+		URL.revokeObjectURL(url);
+	});
+
+	speedRange.addEventListener('input', () => updateInsights(insightsSection, editor, durationSelect, speedRange));
+	durationSelect.addEventListener('change', () => updateInsights(insightsSection, editor, durationSelect, speedRange));
+	editor.addEventListener('input', () => {
+		state.script = editor.textContent || '';
+		updateInsights(insightsSection, editor, durationSelect, speedRange);
+	});
+
+	syncDropzoneLabel();
+	syncTopicState();
+	setScriptContent(editor, '');
+	updateInsights(insightsSection, editor, durationSelect, speedRange);
 }
 
-function boot() {
-	initializeDom();
-	bindEvents();
-	updateUploadState();
-	renderTopics();
-	renderValidation(null);
-	renderScript("");
-	setStatus("Ready. Upload a document to begin.", "neutral");
-}
-
-document.addEventListener("DOMContentLoaded", boot);
+document.addEventListener('DOMContentLoaded', bindApp);
