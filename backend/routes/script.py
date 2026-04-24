@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List, Literal
 from services.script_generator import generate_podcast_script
 from services.script_refiner import refine_script
 from services.supabase_store import save_to_supabase
@@ -10,12 +10,12 @@ router = APIRouter()
 
 class ScriptRequest(BaseModel):
     host_name: str
-    host_gender: str
+    host_gender: Literal["male", "female"]
     guest_name: str
-    guest_gender: str
-    host_speed: int       # 1–10
-    guest_speed: int      # 1–10
-    duration: int         # minutes
+    guest_gender: Literal["male", "female"]
+    host_speed: int = Field(..., ge=50, le=150)
+    guest_speed: int = Field(..., ge=50, le=150)
+    duration: int = Field(..., ge=2, le=5)
     topics: List[str]
 
 class ModifyRequest(BaseModel):

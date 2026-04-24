@@ -6,36 +6,13 @@ from typing import List
 from langchain_core.prompts import PromptTemplate
 from langchain_groq import ChatGroq
 
-from config.settings import GROQ_API_KEY
+from config.settings import GROQ_API_KEY, GROQ_MODEL
+from prompts import SCRIPT_GENERATION_TEMPLATE
 
-# Approximate words per minute based on speed slider (1–10 scale)
+# Approximate words per minute based on speed slider (50–150 scale)
 def _words_for_duration(duration_minutes: int, speed: int) -> int:
-    wpm = 100 + (speed - 1) * 15  # range: 100–235 wpm
+    wpm = max(50, min(150, speed))
     return duration_minutes * wpm
-
-SCRIPT_TEMPLATE = """
-You are a professional podcast script writer.
-
-Write a complete, natural-sounding podcast script with the following details:
-
-Host: {host_name} ({host_gender})
-Guest: {guest_name} ({guest_gender})
-Topics to cover: {topics}
-Target length: approximately {word_count} words total
-
-Guidelines:
-- Start with a warm opening by the host
-- Include natural fillers like "um", "hmm", "you know", "right"
-- Cover each topic with a smooth transition
-- Host asks questions, guest provides insights
-- End with a closing summary and sign-off
-- Format each line as: [SPEAKER NAME]: dialogue
-
-Context from uploaded document:
-{document_excerpt}
-
-Write the full script now:
-"""
 
 def generate_podcast_script(
     document_text: str,
@@ -54,9 +31,9 @@ def generate_podcast_script(
     # Use first 3000 chars of document as context
     excerpt = document_text[:3000].strip()
 
-    prompt = PromptTemplate.from_template(SCRIPT_TEMPLATE)
+    prompt = PromptTemplate.from_template(SCRIPT_GENERATION_TEMPLATE)
 
-    llm = ChatGroq(api_key=GROQ_API_KEY, model_name="llama3-8b-8192", temperature=0.7)
+    llm = ChatGroq(api_key=GROQ_API_KEY, model_name=GROQ_MODEL, temperature=0.7)
     chain = prompt | llm
 
     result = chain.invoke(

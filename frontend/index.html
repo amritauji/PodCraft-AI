@@ -10,6 +10,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="/assets/style.css" rel="stylesheet"/>
+<script>
+                (function () {
+                    try {
+                        var saved = localStorage.getItem('podcraft-theme');
+                        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        var useDark = saved ? saved === 'dark' : prefersDark;
+                        if (useDark) {
+                            document.documentElement.classList.add('dark');
+                        }
+                    } catch (e) {
+                        // Ignore storage access issues and keep light mode as fallback.
+                    }
+                })();
+        </script>
 <style>
         .material-symbols-outlined {
           font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -121,7 +136,7 @@
 </head>
 <body class="bg-background text-on-background font-body-md h-screen w-full overflow-hidden flex antialiased">
 <!-- SideNavBar -->
-<nav class="bg-surface-container-lowest h-screen w-64 border-r border-surface-variant shadow-[2px_0_8px_rgba(0,0,0,0.02)] flex flex-col fixed left-0 top-0 h-full z-40">
+<nav class="app-sidenav bg-surface-container-lowest h-screen w-64 border-r border-surface-variant shadow-[2px_0_8px_rgba(0,0,0,0.02)] flex flex-col fixed left-0 top-0 h-full z-40">
 <div class="p-lg flex items-center gap-md border-b border-surface-variant">
 <div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-on-primary font-h3">
 <span class="material-symbols-outlined fill">graphic_eq</span>
@@ -137,15 +152,6 @@
 <span class="material-symbols-outlined">add_circle</span>
                 New Script
             </a>
-<!-- Inactive Tabs -->
-<a class="flex items-center gap-md px-md py-md rounded-lg text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low hover:text-on-surface transition-colors duration-200" href="#">
-<span class="material-symbols-outlined">library_books</span>
-                My Scripts
-            </a>
-<a class="flex items-center gap-md px-md py-md rounded-lg text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low hover:text-on-surface transition-colors duration-200" href="#">
-<span class="material-symbols-outlined">settings</span>
-                Settings
-            </a>
 </div>
 <div class="p-lg border-t border-surface-variant">
 <button class="w-full bg-primary text-on-primary py-sm px-md rounded-lg font-label-md text-label-md shadow-sm hover:opacity-90 transition-opacity flex justify-center items-center gap-sm">
@@ -157,13 +163,11 @@
 <!-- Main Content Wrapper -->
 <div class="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
 <!-- TopAppBar -->
-<header class="bg-surface-container-lowest/80 backdrop-blur-md w-full h-16 border-b border-surface-variant shadow-sm flex items-center justify-between px-lg sticky top-0 z-30">
+<header class="app-topbar bg-surface-container-lowest/80 backdrop-blur-md w-full h-16 border-b border-surface-variant shadow-sm flex items-center justify-between px-lg sticky top-0 z-30">
 <div class="flex items-center gap-xl h-full">
 <nav class="flex gap-lg h-full pt-md">
 <!-- Active matching intent of New Script -->
 <a class="text-primary font-label-md text-label-md border-b-2 border-primary pb-4 h-full flex items-center" href="#">Workspace</a>
-<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors h-full flex items-center pb-4 border-b-2 border-transparent" href="#">Templates</a>
-<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors h-full flex items-center pb-4 border-b-2 border-transparent" href="#">Analytics</a>
 </nav>
 </div>
 <div class="flex items-center gap-md">
@@ -313,67 +317,7 @@
 </section>
 </div>
 </div>
-<!-- Right Panel: AI Insights -->
-<aside class="w-80 border-l border-surface-variant bg-surface-container-lowest flex flex-col h-full hidden xl:flex shadow-[-2px_0_8px_rgba(0,0,0,0.01)]">
-<div class="p-lg border-b border-surface-variant flex items-center gap-sm">
-<span class="material-symbols-outlined text-primary">insights</span>
-<h3 class="text-h3 font-h3 text-on-surface">AI Insights</h3>
-</div>
-<div class="p-lg space-y-xl overflow-y-auto">
-<!-- Metric: Duration -->
-<div class="space-y-sm">
-<div class="flex justify-between items-center">
-<span class="text-label-md font-label-md text-on-surface-variant flex items-center gap-xs">
-<span class="material-symbols-outlined text-[16px]">schedule</span> Est. Duration
-                            </span>
-<span class="text-label-md font-label-md text-on-surface font-semibold">14m 30s</span>
-</div>
-<div class="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden">
-<div class="h-full bg-primary rounded-full" style="width: 48%;"></div>
-</div>
-<p class="text-label-sm font-label-sm text-on-surface-variant text-right">Target: 30m</p>
-</div>
-<!-- Metric: Topic Coverage -->
-<div class="space-y-sm">
-<div class="flex justify-between items-center">
-<span class="text-label-md font-label-md text-on-surface-variant flex items-center gap-xs">
-<span class="material-symbols-outlined text-[16px]">pie_chart</span> Topic Coverage
-                            </span>
-<span class="text-label-md font-label-md text-on-surface font-semibold">85%</span>
-</div>
-<div class="w-full h-1.5 bg-surface-variant rounded-full overflow-hidden flex">
-<div class="h-full bg-primary rounded-l-full border-r border-surface-container-lowest" style="width: 50%;" title="AI Ethics"></div>
-<div class="h-full bg-primary/60 rounded-r-full" style="width: 35%;" title="Future of Work"></div>
-</div>
-<div class="flex justify-between text-label-sm font-label-sm text-on-surface-variant mt-xs">
-<span class="flex items-center gap-xs"><div class="w-2 h-2 rounded-full bg-primary"></div> AI Ethics</span>
-<span class="flex items-center gap-xs"><div class="w-2 h-2 rounded-full bg-primary/60"></div> Future of Work</span>
-</div>
-</div>
-<!-- Metric: Tone Assessment -->
-<div class="space-y-sm">
-<span class="text-label-md font-label-md text-on-surface-variant flex items-center gap-xs">
-<span class="material-symbols-outlined text-[16px]">psychology</span> Detected Tone
-                        </span>
-<div class="flex flex-wrap gap-xs pt-xs">
-<span class="bg-secondary-container text-on-secondary-container px-md py-xs rounded-full font-label-sm text-label-sm border border-transparent">Professional</span>
-<span class="bg-surface text-on-surface-variant px-md py-xs rounded-full font-label-sm text-label-sm border border-outline-variant">Analytical</span>
-</div>
-<p class="text-body-sm font-body-sm text-on-surface-variant pt-xs leading-relaxed">The dialogue maintains a high-level academic tone suitable for industry professionals, though lacks conversational bridges.</p>
-</div>
-<!-- Actionable Suggestion -->
-<div class="bg-surface-container-low rounded-lg p-md border border-surface-variant mt-xl">
-<div class="flex items-start gap-sm">
-<span class="material-symbols-outlined text-tertiary-container mt-0.5">lightbulb</span>
-<div>
-<h4 class="text-label-md font-label-md text-on-surface">Improve Engagement</h4>
-<p class="text-body-sm font-body-sm text-on-surface-variant mt-xs">Add a personal anecdote in the "Future of Work" segment to humanize the theoretical discussion.</p>
-<button class="text-primary font-label-sm text-label-sm mt-sm hover:underline">Apply Suggestion</button>
-</div>
-</div>
-</div>
-</div>
-</aside>
 </main>
 </div>
+<script src="/assets/script.js" defer></script>
 </body></html>

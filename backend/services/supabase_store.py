@@ -1,13 +1,18 @@
 # Supabase storage service
 # Saves generated scripts and user inputs with timestamps
 
+import logging
+from datetime import datetime, timezone
+
 from supabase import create_client
 from config.settings import SUPABASE_URL, SUPABASE_KEY
-from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 def save_to_supabase(user_inputs: dict, script: str):
     if not SUPABASE_URL or not SUPABASE_KEY:
-        return  # Skip silently if Supabase is not configured
+        logger.info("Supabase is not configured. Skipping persistence.")
+        return
 
     try:
         client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -20,4 +25,4 @@ def save_to_supabase(user_inputs: dict, script: str):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
     except Exception as e:
-        print(f"[Supabase] Failed to save: {e}")
+        logger.warning("Supabase persistence failed: %s", e)

@@ -9,4 +9,13 @@ services:
       - "8000:8000"
     env_file:
       - ../.env
+    environment:
+      - APP_ENV=production
+      - UVICORN_WORKERS=2
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped

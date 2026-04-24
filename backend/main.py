@@ -1,13 +1,30 @@
 from pathlib import Path
+import logging
 
 from fastapi import FastAPI
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from config.settings import ALLOWED_ORIGINS
+from config.settings import (
+    ALLOWED_ORIGINS,
+    APP_NAME,
+    APP_VERSION,
+    DEBUG,
+    LOG_LEVEL,
+    get_missing_required_settings,
+    is_production,
+)
 from routes import upload, topics, script
 
-app = FastAPI(title="PodCraft AI", version="1.0.0")
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title=APP_NAME, version=APP_VERSION, debug=DEBUG)
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
@@ -27,6 +44,40 @@ app.add_middleware(
 app.include_router(upload.router)
 app.include_router(topics.router)
 app.include_router(script.router)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    missing = get_missing_required_settings()
+    if missing:
+        message = f"Missing required environment variables: {', '.join(missing)}"
+        if is_production():
+            logger.error(message)
+        else:
+            logger.warning("%s. App is running in limited mode.", message)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled error at %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error."})
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz():
+    missing = get_missing_required_settings()
+    if missing:
+        return {
+            "status": "degraded",
+            "missing": missing,
+            "message": "Required integrations are not fully configured.",
+        }
+    return {"status": "ready"}
 
 @app.get("/")
 def root():
