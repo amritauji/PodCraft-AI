@@ -98,6 +98,8 @@ sequenceDiagram
 └──────────────────────────────────────────────────────────────┘
 ```
 
+<img width="1600" height="1280" alt="WhatsApp Image 2026-04-24 at 12 40 04 AM" src="https://github.com/user-attachments/assets/a4fbe29d-91be-4454-85ef-a73d7999158e" />
+
 ## Project Structure
 
 PodCraft-AI/
