@@ -27,6 +27,77 @@ This README is written for developers who want to understand, run, and deploy th
 
 Frontend and backend are served from one origin in local and container mode through FastAPI.
 
+## Architecture Visuals
+
+### Component Diagram
+
+```mermaid
+flowchart LR
+    U[User Browser] --> F[Frontend UI\nHTML + CSS + JS]
+    F -->|HTTP API| B[FastAPI Backend]
+
+    subgraph Backend Pipeline
+      B --> D[Document Analyzer]
+      D --> T[Topic Extractor]
+      T --> V[Topic Validator]
+      V --> G[Script Generator\nGroq + LangChain]
+      G --> R[Script Refiner\nGroq + LangChain]
+    end
+
+    B --> S[(Supabase Optional)]
+```
+
+### Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as Frontend
+    participant API as FastAPI
+    participant AI as Groq LLM
+    participant DB as Supabase (Optional)
+
+    User->>UI: Upload document + set inputs
+    UI->>API: POST /upload-docs
+    API-->>UI: Upload processed
+
+    UI->>API: GET /extract-topics
+    API-->>UI: Extracted topics
+
+    UI->>API: POST /validate-topics
+    API-->>UI: Included/Ignored topics
+
+    UI->>API: POST /generate-script
+    API->>AI: Prompt + context
+    AI-->>API: Generated script
+    API->>DB: Save script (if configured)
+    API-->>UI: Script text
+
+    User->>UI: Refinement instruction
+    UI->>API: POST /modify-script
+    API->>AI: Rewrite instruction + script
+    AI-->>API: Revised script
+    API-->>UI: Updated script
+```
+
+### UI Layout Snapshot (Conceptual)
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Sidebar / Header                                             │
+├──────────────────────────────────────────────────────────────┤
+│ Source Material                                              │
+│ - Upload document                                            │
+│ - Host/Guest details, speed, duration                        │
+├──────────────────────────────────────────────────────────────┤
+│ Extracted Topics                                             │
+│ - Topic chips + generate                                     │
+├──────────────────────────────────────────────────────────────┤
+│ Script Output                                                 │
+│ - Generated content + refine input + copy/export             │
+└──────────────────────────────────────────────────────────────┘
+```
+
 ## Project Structure
 
 PodCraft-AI/
@@ -124,6 +195,33 @@ Optional:
 - For horizontal scaling or multi-instance workloads, switch session state to Redis or database-backed storage.
 - Supabase persistence is optional; app still works without it.
 
+## Features
+
+- Document upload support for PDF, DOCX, and TXT.
+- Automatic topic extraction with fallback logic.
+- Topic validation showing included and ignored topics.
+- Podcast script generation with host/guest metadata.
+- Script refinement via natural-language instructions.
+- Light and dark mode support.
+- Health and readiness endpoints for operations.
+- Optional Supabase persistence.
+
+## Roadmap
+
+Near-term improvements (simple, high-impact):
+
+- [ ] Add basic automated API smoke tests.
+- [ ] Add request/response examples in API docs.
+- [ ] Improve Supabase error diagnostics and table validation.
+- [ ] Add export to Markdown and DOCX formats.
+- [ ] Add simple usage analytics for generation/refinement calls.
+
+Mid-term improvements:
+
+- [ ] Replace in-memory session with Redis for multi-user support.
+- [ ] Add authentication and per-user script history.
+- [ ] Add background task queue for large document processing.
+
 ## Docker Usage
 
 From project root:
@@ -175,3 +273,12 @@ Use this schema if you want to store generated scripts:
       script text,
       created_at timestamptz
     );
+
+## License
+
+This repository currently does not include a license file.
+
+Until a LICENSE file is added, all rights are reserved by default.
+
+Recommended next step:
+- Add a LICENSE file (for example MIT) if you plan to open-source the project.
