@@ -1,168 +1,177 @@
 # PodCraft AI
 
-An AI-powered Podcast Script Generation System built with FastAPI, LangChain, Groq (LLaMA), and Supabase. Deployable on AWS S3 (frontend) + EC2 (backend via Docker).
+PodCraft AI is a full-stack app that turns uploaded source material into a podcast script.
 
----
+The project is intentionally simple:
+- FastAPI backend for API + static frontend serving
+- HTML/CSS/JS frontend for the workspace UI
+- Groq LLM for topic-aware script generation and refinement
+- Optional Supabase persistence for generated scripts
 
-## Architecture
+This README is written for developers who want to understand, run, and deploy the project quickly.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     PodCraft AI                         │
-│                                                         │
-│  ┌──────────────┐          ┌──────────────────────────┐ │
-│  │   Frontend   │  HTTP    │       Backend (FastAPI)  │ │
-│  │  (S3 Static) │ ──────►  │                          │ │
-│  │  HTML/CSS/JS │          │  Agent Pipeline:         │ │
-│  └──────────────┘          │  1. Document Analyzer    │ │
-│                            │  2. Topic Extractor      │ │
-│  AWS S3                    │  3. Topic Validator      │ │
-│  Static Hosting            │  4. Prompt Builder       │ │
-│                            │  5. Script Generator     │ │
-│                            │  6. Script Refiner       │ │
-│                            │                          │ │
-│                            │  Groq API (LLaMA)        │ │
-│                            │  Supabase (Storage)      │ │
-│                            └──────────────────────────┘ │
-│                                   AWS EC2 + Docker       │
-└─────────────────────────────────────────────────────────┘
-```
+## What The App Does
 
----
+1. Upload a PDF, DOCX, or TXT file.
+2. Extract topics from the uploaded content.
+3. Select topics and provide speaking metadata.
+4. Generate a podcast script.
+5. Refine the script with natural-language instructions.
 
-## Local Setup
+## High-Level Architecture
 
-### Prerequisites
+- Frontend: static app in the frontend folder.
+- Backend: FastAPI app in the backend folder.
+- LLM integration: Groq via LangChain.
+- Persistence: Supabase (optional).
+
+Frontend and backend are served from one origin in local and container mode through FastAPI.
+
+## Project Structure
+
+PodCraft-AI/
+- backend/
+  - config/: runtime settings and environment parsing
+  - routes/: API endpoints (upload, topics, script)
+  - services/: business logic (extraction, generation, refinement, storage)
+  - prompts/: prompt templates and examples
+  - utils/: shared helpers (session store)
+  - main.py: app entrypoint, middleware, static mounting, health endpoints
+  - requirements.txt: backend dependencies
+- frontend/
+  - index.html: UI structure
+  - style.css: UI styling (including dark mode overrides)
+  - script.js: UI behavior and API wiring
+- docker/
+  - Dockerfile: production container image
+  - docker-compose.yml: local/production-like container run
+- .env.example: sample environment configuration
+- README.md
+
+## Requirements
+
 - Python 3.13+
-- [uv](https://docs.astral.sh/uv/) — fast Python package manager
+- uv package manager
+- Groq API key (required for generation)
+- Supabase project credentials (optional)
 
-```bash
-# Install uv (if not already installed)
-curl -Ls https://astral.sh/uv/install.sh | sh   # macOS/Linux
-# or on Windows (PowerShell):
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
+## Quick Start (Local)
 
-### Steps
+1. Clone repository and open project root.
+2. Copy .env.example to .env.
+3. Fill required values in .env.
+4. Install backend dependencies.
+5. Run FastAPI.
+6. Open the app in browser.
 
-```bash
-# 1. Clone the repo
-git clone <your-repo-url>
-cd PodCraft-AI
+Commands:
 
-# 2. Create .env from example
-cp .env.example .env
-# Fill in GROQ_API_KEY, SUPABASE_URL, SUPABASE_KEY
+macOS/Linux:
 
-# 3. Create venv and install backend dependencies with uv
-cd backend
-uv venv
-uv pip install -r requirements.txt
+    cp .env.example .env
+    cd backend
+    uv venv
+    uv pip install -r requirements.txt
+    uv run uvicorn main:app --reload --port 8000
 
-# 4. Run the backend
-uv run uvicorn main:app --reload --port 8000
+Windows PowerShell:
 
-# 5. Open the app
-# Visit http://localhost:8000 in your browser. The FastAPI app now serves the frontend UI and API from the same origin.
-```
+    Copy-Item ..\.env.example ..\.env
+    cd backend
+    uv venv
+    uv pip install -r requirements.txt
+    uv run uvicorn main:app --reload --port 8000
 
----
-
-## Docker Setup
-
-```bash
-# From project root
-cd docker
-docker-compose up --build
-
-# Backend and frontend run together at http://localhost:8000
-```
-
----
-
-## AWS Deployment
-
-### A) Frontend → AWS S3
-
-1. Go to AWS Console → S3 → Create Bucket
-2. Uncheck "Block all public access"
-3. Upload all files from `frontend/` folder
-4. Go to Properties → Static Website Hosting → Enable
-5. Set index document to `index.html`
-6. Update `API_BASE_URL` in `frontend/script.js` to your EC2 public IP if you keep the frontend separate. If you serve the frontend from FastAPI, you can keep it on the same origin instead:
-   ```js
-   const API_BASE_URL = "http://<your-ec2-public-ip>:8000";
-   ```
-7. Note the S3 website URL (e.g. `http://your-bucket.s3-website-us-east-1.amazonaws.com`)
-8. Add that URL to `ALLOWED_ORIGINS` in `backend/config/settings.py` and redeploy
-
-### B) Backend → AWS EC2 (Docker)
-
-```bash
-# 1. Launch EC2 (Ubuntu 22.04, t2.micro or larger)
-# 2. Open port 8000 in Security Group inbound rules
-
-# 3. SSH into EC2
-ssh -i your-key.pem ubuntu@<ec2-public-ip>
-
-# 4. Install Docker
-sudo apt update && sudo apt install -y docker.io docker-compose
-sudo systemctl start docker
-
-# 5. Clone your repo
-git clone <your-repo-url>
-cd PodCraft-AI
-
-# 6. Create .env file
-cp .env.example .env
-nano .env  # fill in your keys
-
-# 7. Run the container
-cd docker
-sudo docker-compose up -d --build
-
-# Backend is live at http://<ec2-public-ip>:8000
-```
-
----
+Open:
+- http://localhost:8000
+- API docs: http://localhost:8000/docs
 
 ## Environment Variables
 
-| Variable       | Description                        |
-|----------------|------------------------------------|
-| GROQ_API_KEY   | API key from console.groq.com      |
-| SUPABASE_URL   | Your Supabase project URL          |
-| SUPABASE_KEY   | Your Supabase anon/public key      |
+Required:
+- GROQ_API_KEY: Groq API key.
 
----
+Recommended:
+- GROQ_MODEL: model name, default is llama-3.1-8b-instant.
 
-## API Documentation
+Optional:
+- SUPABASE_URL: Supabase project URL.
+- SUPABASE_KEY: Supabase key.
+- APP_ENV: development or production.
+- DEBUG: true or false.
+- LOG_LEVEL: INFO, WARNING, ERROR, etc.
+- MAX_UPLOAD_SIZE_MB: max upload size in MB.
+- ALLOWED_ORIGINS: comma-separated CORS origins.
+- PORT: service port (used in container mode).
+- UVICORN_WORKERS: number of worker processes.
 
-| Method | Endpoint          | Description                          |
-|--------|-------------------|--------------------------------------|
-| POST   | /upload-docs      | Upload PDF, DOCX, or TXT document    |
-| GET    | /extract-topics   | Extract top 10 topics from document  |
-| POST   | /validate-topics  | Validate user topics vs extracted    |
-| POST   | /generate-script  | Generate full podcast script         |
-| POST   | /modify-script    | Refine script with new instructions  |
-| POST   | /reset            | Clear session data                   |
+## API Endpoints
 
-Interactive API docs available at: `http://localhost:8000/docs`
+- GET /: serves frontend index page.
+- POST /upload-docs: upload source document.
+- GET /extract-topics: extract topics from uploaded content.
+- POST /validate-topics: compare user topics against extracted topics.
+- POST /generate-script: generate podcast script.
+- POST /modify-script: refine generated script.
+- POST /reset: clear in-memory session state.
+- GET /healthz: liveness probe.
+- GET /readyz: readiness probe with config hints.
 
----
+## Runtime Behavior And Limitations
 
-## Supabase Table Setup
+- Session storage is currently in-memory.
+- In-memory session means single-process/single-instance friendly behavior.
+- For horizontal scaling or multi-instance workloads, switch session state to Redis or database-backed storage.
+- Supabase persistence is optional; app still works without it.
 
-Run this SQL in your Supabase SQL editor:
+## Docker Usage
 
-```sql
-create table podcast_scripts (
-  id uuid default gen_random_uuid() primary key,
-  host_name text,
-  guest_name text,
-  topics text[],
-  duration int,
-  script text,
-  created_at timestamptz
-);
-```
+From project root:
+
+    cd docker
+    docker compose up --build
+
+The service runs on port 8000.
+
+Container defaults include:
+- non-root runtime user
+- configurable worker count
+- healthcheck through /healthz
+
+## Minimal Production Checklist
+
+1. Set APP_ENV=production.
+2. Set DEBUG=false.
+3. Set a valid GROQ_API_KEY.
+4. Restrict ALLOWED_ORIGINS to real frontend domains.
+5. Set MAX_UPLOAD_SIZE_MB to a safe limit.
+6. Use /healthz and /readyz in infrastructure probes.
+7. Store .env values in a secure secret manager for cloud environments.
+
+## Troubleshooting
+
+Frontend loads but API calls fail:
+- Verify backend is running on port 8000.
+- Verify ALLOWED_ORIGINS includes your frontend origin.
+
+Script generation fails:
+- Confirm GROQ_API_KEY is set.
+- Check backend logs for upstream API errors.
+
+No records in Supabase:
+- Confirm SUPABASE_URL and SUPABASE_KEY are set.
+- Verify podcast_scripts table exists.
+
+## Supabase Table Example
+
+Use this schema if you want to store generated scripts:
+
+    create table podcast_scripts (
+      id uuid default gen_random_uuid() primary key,
+      host_name text,
+      guest_name text,
+      topics text[],
+      duration int,
+      script text,
+      created_at timestamptz
+    );
